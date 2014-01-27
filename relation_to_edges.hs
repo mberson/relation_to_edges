@@ -14,7 +14,7 @@ purge_columns records =
 -- In testing, the CSV brought in some empty records. We only care about
 -- records that contain information.
 purge_empty :: CSV -> CSV
-purge_empty records = filter (\row -> (length row) > 1 ) records
+purge_empty records = filter (\row -> (length row) > 1) records
 
 -- The file brings names in as two separate columns, but we're actually
 -- interested in first name-last name combinations to tell people apart. This
@@ -59,7 +59,20 @@ academies table = nub $ map academy table
 -- and B is the list of attendees
 academies_and_attendees :: CSV -> [ (Field, Record) ]
 academies_and_attendees table =
-  map (\academy_name -> (academy_name, attendees table academy_name)) $ academies table
+  map (\academy_name -> (academy_name, attendees table academy_name)) $
+    academies table
+
+-- Given a list of attendees, produce the list of all pairs from within the
+-- list
+find_edges :: Record -> CSV
+find_edges attendees = [ [a, b] | a <- attendees, b <- attendees, a /= b ]
+
+-- Given a table, produce the list of tuples (A, B) where A is an academy name
+-- and B is the list of pairs of attendees
+
+academies_and_attendee_pairs :: CSV -> [ (Field, CSV) ]
+academies_and_attendee_pairs table =
+  map (\(a, b) -> (a, find_edges b)) $ academies_and_attendees table
 
 input_file_name :: FilePath
 input_file_name = "/home/max/transit_alliance/AcademyRoster_for_haskell.csv"
@@ -69,12 +82,10 @@ output_file_name = "/home/max/transit_alliance/AcademyNetworkGraph.csv"
 
 -- The main action of this module is to bring in data from the CSV file, and
 -- either let the user know that there was an error, or find the edges within
--- the graph represented by the input. The input contains separate fields for
--- first name and last name, but we'd like to consider the person's full name
--- for finding matches.
+-- the graph represented by the input.
 main :: IO ()
 main = do
   raw_CSV <- parseCSVFromFile input_file_name
   case raw_CSV of
     Left errmsg    -> putStrLn "CSV parse error:" >> print errmsg
-    Right contents -> print $ academies_and_attendees $ clean_input contents
+    Right contents -> writeFile output_file_name $ printCSV $ snd $ head $ academies_and_attendee_pairs $ clean_input contents
