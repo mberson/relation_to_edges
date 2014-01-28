@@ -69,23 +69,49 @@ find_edges attendees = [ [a, b] | a <- attendees, b <- attendees, a /= b ]
 
 -- Given a table, produce the list of tuples (A, B) where A is an academy name
 -- and B is the list of pairs of attendees
-
 academies_and_attendee_pairs :: CSV -> [ (Field, CSV) ]
 academies_and_attendee_pairs table =
   map (\(a, b) -> (a, find_edges b)) $ academies_and_attendees table
 
-input_file_name :: FilePath
-input_file_name = "/home/max/transit_alliance/AcademyRoster_for_haskell.csv"
+-- Given a CSV table, produce the string that we'll write out to a file.
+node_table :: CSV -> String
+node_table roll_sheet =
+  -- NB: As written below, this will not work if there are two people with
+  -- the same name in the database.
+  let
+    names = nub $ map name roll_sheet
+    name_count = length names - 1
+    id_to_name x = [show x, names !! x]
+    table = ["Id","Label"] : map id_to_name [0..name_count]
+  in printCSV table
 
-output_file_name :: FilePath
-output_file_name = "/home/max/transit_alliance/AcademyNetworkGraph.csv"
+input_file :: FilePath
+input_file = "/home/max/transit_alliance/AcademyRoster_for_haskell.csv"
+
+node_table_file :: FilePath
+node_table_file = "/home/max/transit_alliance/Academy_node_table.csv"
+
+edge_table_file :: FilePath
+edge_table_file = "/home/max/transit_alliance/Academy_edge_table.csv"
+
+graph :: CSV -> IO ()
+graph table =
+  let
+    sheet = clean_input table
+  in
+    do
+      writeFile node_table_file $ node_table $ sheet
+--    writeFile edge_table_file $ edge_table sheet
+    
 
 -- The main action of this module is to bring in data from the CSV file, and
 -- either let the user know that there was an error, or find the edges within
 -- the graph represented by the input.
 main :: IO ()
 main = do
-  raw_CSV <- parseCSVFromFile input_file_name
+  raw_CSV <- parseCSVFromFile input_file
   case raw_CSV of
-    Left errmsg    -> putStrLn "CSV parse error:" >> print errmsg
-    Right contents -> writeFile output_file_name $ printCSV $ snd $ head $ academies_and_attendee_pairs $ clean_input contents
+    Left errmsg      -> putStrLn "CSV parse error:" >> print errmsg
+    Right roll_sheet -> graph roll_sheet
+
+
